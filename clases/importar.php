@@ -1,54 +1,52 @@
 <?php
-require_once 'Conection.php';
+class Importar extends Connection {
+    function customer() {
+        $file = 'customers.csv';
+        $conn = $this->getConn();
+        $csv = fopen($file, "r");
 
-class Importar extends Conection {
-    
-    public function customers($filename) {
-        $file = fopen($filename, "r");
-        if ($file !== false) {
-            $stmt = $this->conn->prepare("INSERT INTO customers (customerId, customerName) VALUES (?, ?)");
-            while (($data = fgetcsv($file, 1000, "#")) !== false) {
-                $customerId = $data[0];
-                $customerName = $data[1];
-                $stmt->bind_param("ss", $customerId, $customerName);
-                $stmt->execute();
+        if ($csv !== false) {
+            while (($data = fgetcsv($csv, 0, "#")) !== false) {
+                $id = $data[0];
+                $name = $data[1];
+                $query = "UPDATE `customers` SET `customerName` = '$name' WHERE `customerId` = '$id'";
+                mysqli_query($this->getConn(), $query);
             }
-            fclose($file);
-            $stmt->close();
-        } else {
-            echo "Error al abrir el archivo.";
+            fclose($csv);
         }
     }
 
-    public function brandCustomer($filename) {
-        $file = fopen($filename, "r");
-        if ($file !== false) {
-            $stmt = $this->conn->prepare("INSERT INTO brandCustomer (customerId, brandId) VALUES (?, ?)");
-            while (($data = fgetcsv($file, 1000, "#")) !== false) {
+    function getBrandId($brandName) {
+        $conn = $this->getConn();
+        $query = "SELECT brandId FROM brands WHERE brandName = '$brandName'";
+        $result = mysqli_query($conn, $query);
+        if ($row = mysqli_fetch_assoc($result)) {
+            return $row['brandId'];
+        }
+        return null;
+    }
+
+    public function brandCustomer() {
+        $file = 'customers.csv'; 
+        $csv = fopen($file, "r");
+        
+        if ($csv !== false) {
+            $conn = $this->getConn();
+            while (($data = fgetcsv($csv, 0, "#")) !== false) {
                 $customerId = $data[0];
-                $brands = explode(", ", $data[2]);
+                $brands = explode("|", $data[2]);
+
                 foreach ($brands as $brand) {
                     $brandId = $this->getBrandId($brand);
-                    $stmt->bind_param("si", $customerId, $brandId);
-                    $stmt->execute();
+                    if ($brandId !== null) {
+                        $query = "INSERT INTO `brandcustomer` (`customerId`, `brandId`) VALUES ('$customerId', '$brandId')";
+                        mysqli_query($conn, $query);
+                    } 
                 }
             }
-            fclose($file);
-            $stmt->close();
-        } else {
-            echo "Error al abrir el archivo.";
+            fclose($csv);
         }
     }
-
-    public function getBrandId($brandName) {
-        $stmt = $this->conn->prepare("SELECT brandId FROM brands WHERE brandName = ?");
-        $stmt->bind_param("s", $brandName);
-        $stmt->execute();
-        $stmt->bind_result($brandId);
-        $stmt->fetch();
-        $stmt->close();
-        return $brandId;
-    }
 }
-
 ?>
+
